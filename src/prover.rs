@@ -282,7 +282,7 @@ async fn run_authenticated_proving_loop_optimized(
     let mut consecutive_failures = 0;
     
     loop {
-        const MAX_ATTEMPTS: usize = 5; // 单次证明最大尝试5次
+        const MAX_ATTEMPTS: usize = 5;
         let mut attempt = 1;
         let mut success = false;
         let mut last_error = String::new();
@@ -295,7 +295,7 @@ async fn run_authenticated_proving_loop_optimized(
                     break;
                 }
                 Err(ProverError::RateLimited(_)) => {
-                    // 429错误，简化为简短信息，等待更长时间后重试
+
                     last_error = "Rate limited (429) - retry in 60s".to_string();
                     tokio::time::sleep(Duration::from_secs(60)).await;
                     attempt += 1;
@@ -317,7 +317,7 @@ async fn run_authenticated_proving_loop_optimized(
         }
 
         if success {
-            consecutive_failures = 0; // 重置失败计数
+                                consecutive_failures = 0;
             println!("{}: ✅ Proof #{} done", prefix, proof_count);
             proof_count += 1;
         } else {
@@ -325,9 +325,8 @@ async fn run_authenticated_proving_loop_optimized(
             println!("{}: ❌ {} (retry {}/∞)", 
                      prefix, last_error, consecutive_failures);
             
-            // 无限重试，失败后等待10秒再继续
-            tokio::time::sleep(Duration::from_secs(10)).await;
-            continue; // 不增加proof_count，重试相同的证明
+                    tokio::time::sleep(Duration::from_secs(10)).await;
+        continue;
         }
 
         let client_id = format!("{:x}", md5::compute(node_id.to_le_bytes()));
@@ -347,7 +346,7 @@ async fn run_authenticated_proving_loop_optimized(
     }
 }
 
-/// Memory-optimized silent authenticated proving - 使用新的Task接口和签名
+/// Memory-optimized silent authenticated proving
 #[allow(dead_code)]
 async fn authenticated_proving_silent(
     node_id: u64,
@@ -390,7 +389,7 @@ async fn authenticated_proving_silent(
     Ok(proof_size)
 }
 
-/// Original authenticated proving (for single node mode and UI) - 使用新的Task接口和签名
+/// Original authenticated proving (for single node mode and UI)
 pub async fn authenticated_proving(
     node_id: u64,
     orchestrator_client: &OrchestratorClient,
@@ -442,7 +441,7 @@ pub async fn authenticated_proving(
     Ok(())
 }
 
-/// 改进的匿名证明函数，参考0.8.8的实现
+/// Improved anonymous proving function
 pub fn prove_anonymously() -> Result<(), ProverError> {
     let public_input: u32 = 9;
     let stwo_prover = get_default_stwo_prover()?;
@@ -476,7 +475,7 @@ pub fn get_default_stwo_prover() -> Result<Stwo, ProverError> {
     })
 }
 
-/// 改进的认证证明函数，支持Task结构体
+/// Improved authenticated proving function supporting Task struct
 pub fn prove_with_task(task: &Task) -> Result<Vec<u8>, ProverError> {
     let public_input = get_public_input(task)?;
     let stwo_prover = get_default_stwo_prover()?;
@@ -685,7 +684,7 @@ where
     }
 }
 
-/// 高效版本的认证证明 - 为prover_runtime优化
+/// Efficient version of authenticated proving - optimized for prover_runtime
 #[allow(dead_code)]
 pub async fn authenticated_proving_fast(
     task: &Task,

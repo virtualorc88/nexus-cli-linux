@@ -1,4 +1,5 @@
-# Nexus-cli Linux内存优化版
+# Nexus-cli Linux内存优化版(基于官方0.8.14更新)
+Mac版:https://github.com/huahua1220/nexus-cli-mac
 
 有问题联系推特：https://x.com/hua_web3
 
@@ -24,15 +25,18 @@ cargo build --release
 ## 使用方法
 
 ### 准备节点文件
-运行前先打开 `target/release/nodes.txt` 文件，一行一个节点ID
+运行前先打开 `sudo nano ./target/release/nodes.txt` 文件，一行一个节点ID
 
 ### 批量模式
 ```bash
 # 运行批量挖矿
-./target/release/nexus batch-file --file nodes.txt --max-concurrent 线程数
+./target/release/nexus batch-file --file ./target/release/nodes.txt --max-concurrent 节点数
 ```
 
 ## 主要改进
 
 - 内存优化，单个线程比官方版节省30%-50%内存占用
 - 批量节点id启动，防止单个节点id出现429等错误影响效率
+- 批量获取任务功能，减少API调用频率，有效避免429错误
+- 任务池管理，本地缓存任务提高执行效率
+- 智能模式切换，批量获取与单任务模式自动切换

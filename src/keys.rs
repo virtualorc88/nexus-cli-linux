@@ -4,38 +4,31 @@
 
 use ed25519_dalek::{SigningKey, VerifyingKey};
 use std::fs;
-use std::path::Path;
 use std::path::PathBuf;
 
-/// 获取密钥存储路径
-pub fn get_key_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let home_path = home::home_dir().ok_or("Failed to get home directory")?;
-    let key_path = home_path.join(".nexus").join("node.key");
+
+pub fn get_key_path() -> Result<PathBuf, std::io::Error> {
+    let home_dir = home::home_dir().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::NotFound, "Home directory not found")
+    })?;
+
+    fs::create_dir_all(home_dir.join(".nexus"))?;
     
-    // 确保目录存在
-    if let Some(parent) = key_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    
-    Ok(key_path)
+    Ok(home_dir.join(".nexus").join("node_key.json"))
 }
 
-/// 加载或生成签名密钥
 pub fn load_or_generate_signing_key() -> Result<SigningKey, Box<dyn std::error::Error>> {
     let key_path = get_key_path()?;
     
     if key_path.exists() {
-        // 尝试加载现有密钥
         match load_signing_key(&key_path) {
             Ok(key) => return Ok(key),
             Err(_) => {
-                // 如果加载失败，删除损坏的文件并生成新密钥
-                let _ = fs::remove_file(&key_path);
+                fs::remove_file(&key_path)?;
             }
         }
     }
     
-    // 生成新密钥并保存
     let signing_key = SigningKey::generate(&mut rand::thread_rng());
     save_signing_key(&key_path, &signing_key)?;
     
@@ -43,45 +36,53 @@ pub fn load_or_generate_signing_key() -> Result<SigningKey, Box<dyn std::error::
     Ok(signing_key)
 }
 
-/// 从文件加载签名密钥
-fn load_signing_key(path: &Path) -> Result<SigningKey, Box<dyn std::error::Error>> {
-    let key_bytes = fs::read(path)?;
-    if key_bytes.len() != 32 {
-        return Err("Invalid key file length".into());
-    }
+
+pub fn load_signing_key(path: &PathBuf) -> Result<SigningKey, Box<dyn std::error::Error>> {
+    let key_data = fs::read_to_string(path)?;
     
-    let mut key_array = [0u8; 32];
-    key_array.copy_from_slice(&key_bytes);
+    let key_bytes: Vec<u8> = serde_json::from_str(&key_data)?;
+    
+    let key_array: [u8; 32] = key_bytes.try_into()
+        .map_err(|_| "Invalid key length")?;
+    
     Ok(SigningKey::from_bytes(&key_array))
 }
 
-/// 保存签名密钥到文件
-fn save_signing_key(path: &Path, signing_key: &SigningKey) -> Result<(), Box<dyn std::error::Error>> {
-    fs::write(path, signing_key.to_bytes())?;
-    
-    // 设置文件权限为只有所有者可读写 (600)
+
+pub fn save_signing_key(path: &PathBuf, key: &SigningKey) -> Result<(), Box<dyn std::error::Error>> {
+    let key_bytes = key.to_bytes().to_vec();
+
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let permissions = std::fs::Permissions::from_mode(0o600);
-        fs::set_permissions(path, permissions)?;
+        let mut perms = fs::metadata(path.parent().unwrap())?.permissions();
+        perms.set_mode(0o700);
+        fs::set_permissions(path.parent().unwrap(), perms)?;
+    }
+    
+    fs::write(path, serde_json::to_string(&key_bytes)?)?;
+    
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(path)?.permissions();
+        perms.set_mode(0o600);
+        fs::set_permissions(path, perms)?;
     }
     
     Ok(())
 }
 
-/// 验证以太坊地址格式
+
 #[allow(dead_code)]
-pub fn is_valid_eth_address(address: &str) -> bool {
-    address.len() == 42 && 
-    address.starts_with("0x") && 
-    address.chars().skip(2).all(|c| c.is_ascii_hexdigit())
+pub fn is_valid_ethereum_address(address: &str) -> bool {
+    address.len() == 42 && address.starts_with("0x") && 
+        address[2..].chars().all(|c| c.is_ascii_hexdigit())
 }
 
-/// 获取密钥的公钥
 #[allow(dead_code)]
-pub fn get_verifying_key(signing_key: &SigningKey) -> VerifyingKey {
-    signing_key.verifying_key()
+pub fn get_public_key(key: &SigningKey) -> VerifyingKey {
+    key.verifying_key()
 }
 
 #[cfg(test)]
@@ -90,11 +91,11 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
-    fn test_is_valid_eth_address() {
-        assert!(is_valid_eth_address("0x1234567890abcdef1234567890abcdef12345678"));
-        assert!(!is_valid_eth_address("0x123")); // Too short
-        assert!(!is_valid_eth_address("1234567890abcdef1234567890abcdef12345678")); // No 0x prefix
-        assert!(!is_valid_eth_address("0x1234567890abcdef1234567890abcdef1234567g")); // Invalid character
+    fn test_is_valid_ethereum_address() {
+        assert!(is_valid_ethereum_address("0x1234567890abcdef1234567890abcdef12345678"));
+        assert!(!is_valid_ethereum_address("0x123")); // Too short
+        assert!(!is_valid_ethereum_address("1234567890abcdef1234567890abcdef12345678")); // No 0x prefix
+        assert!(!is_valid_ethereum_address("0x1234567890abcdef1234567890abcdef1234567g")); // Invalid character
     }
 
     #[test]

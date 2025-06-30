@@ -40,6 +40,7 @@ mod prover;
 mod prover_runtime;  // New: High-efficiency runtime module
 mod setup;
 mod task;
+mod task_pool;  // New: Task pool for batch processing optimization
 mod ui;
 mod utils;
 mod node_list;
@@ -214,18 +215,18 @@ impl FixedLineDisplay {
     }
 
     async fn render_display(&self, lines: &HashMap<u64, String>) {
-        // 清屏并移动到顶部
+
         print!("\x1b[2J\x1b[H");
         
         // Use cached string for time formatting
         let mut time_str = self.defragmenter.get_cached_string(64).await;
         time_str.push_str(&chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
         
-        // 标题
+
         println!("🚀 Nexus Enhanced Batch Mining Monitor - {}", time_str);
         println!("═══════════════════════════════════════");
         
-        // 统计信息 - 优化迭代器链避免多次遍历
+
         let (total_nodes, successful_count, failed_count, active_count) = lines.values()
             .fold((0, 0, 0, 0), |(total, success, failed, active), status| {
                 let new_total = total + 1;
@@ -256,7 +257,7 @@ impl FixedLineDisplay {
         
         println!("───────────────────────────────────────");
         
-        // 按节点ID排序显示 - 预分配容量
+
         let mut sorted_lines: Vec<_> = Vec::with_capacity(lines.len());
         sorted_lines.extend(lines.iter());
         sorted_lines.sort_unstable_by_key(|(id, _)| *id);
@@ -271,7 +272,7 @@ impl FixedLineDisplay {
         // Return time string to cache
         self.defragmenter.return_string(time_str).await;
         
-        // 强制刷新输出
+
         use std::io::Write;
         std::io::stdout().flush().unwrap();
     }
@@ -387,7 +388,7 @@ async fn start_headless_prover(
     Ok(())
 }
 
-/// 高效批处理启动器 - 使用prover_runtime架构 (解决内存占用过高问题)
+
 async fn start_batch_from_file_with_runtime(
     file_path: &str,
     env: Environment,
@@ -415,11 +416,11 @@ async fn start_batch_from_file_with_runtime(
     println!("🧠 Memory optimization: ENABLED");
     println!("───────────────────────────────────────");
     
-    // 创建高级显示管理器
+
     let display = Arc::new(FixedLineDisplay::new(actual_concurrent));
     display.render_display(&std::collections::HashMap::new()).await;
     
-    // 使用高效工作池为每个节点
+
     let mut join_set = JoinSet::new();
     let (shutdown_sender, _) = broadcast::channel(1);
     
@@ -429,7 +430,7 @@ async fn start_batch_from_file_with_runtime(
         let display = display.clone();
         let shutdown_rx = shutdown_sender.subscribe();
         
-        // 添加启动延迟
+
         if index > 0 {
             tokio::time::sleep(std::time::Duration::from_secs_f64(start_delay)).await;
         }
@@ -438,7 +439,7 @@ async fn start_batch_from_file_with_runtime(
             let prefix = format!("Node-{}", node_id);
             let display_clone = display.clone();
             
-            // 创建状态回调函数用于固定位置显示
+    
             let status_callback = Box::new(move |status: String| {
                 let display = display_clone.clone();
                 let node_id = node_id;
@@ -447,7 +448,7 @@ async fn start_batch_from_file_with_runtime(
                 });
             });
             
-            // 启动内存优化的认证证明循环
+
             match crate::prover_runtime::run_authenticated_proving_optimized(
                 node_id,
                 env,
@@ -468,13 +469,13 @@ async fn start_batch_from_file_with_runtime(
         });
     }
     
-    // 监控和错误处理
+
     monitor_runtime_workers(join_set, display).await;
     
     Ok(())
 }
 
-/// 监控高效运行时工作器
+
 async fn monitor_runtime_workers(
     mut join_set: JoinSet<Result<(), prover::ProverError>>,
     display: Arc<FixedLineDisplay>,
@@ -482,7 +483,7 @@ async fn monitor_runtime_workers(
     while let Some(result) = join_set.join_next().await {
         match result {
             Ok(Ok(())) => {
-                // 工作器正常结束
+
             }
             Ok(Err(e)) => {
                 println!("⚠️ Worker error: {}", e);
@@ -492,7 +493,7 @@ async fn monitor_runtime_workers(
             }
         }
         
-        // 更新显示
+
         display.render_display_optimized().await;
     }
 } 
