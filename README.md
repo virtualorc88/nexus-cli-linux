@@ -1,4 +1,4 @@
-# Nexus-cli Linux内存优化版(基于官方0.8.14更新)
+# Nexus-cli Linux内存优化版(基于官方0.8.14更新) 有问题，先别用，我在改
 Mac版:https://github.com/huahua1220/nexus-cli-mac
 
 有问题联系推特：https://x.com/hua_web3
